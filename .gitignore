@@ -1,0 +1,16 @@
+# Personal data — NEVER commit
+data/
+profile/
+artifacts/
+*.pdf
+*.docx
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local infra
+*.db
+*.sqlite3
