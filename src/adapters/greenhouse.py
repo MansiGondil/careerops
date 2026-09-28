@@ -5,7 +5,7 @@ from src.models import JobPosting
 from src.adapters import SourceAdapter
 
 BASE = "https://boards-api.greenhouse.io/v1/boards"
-HEADERS = {"User-Agent": "job-search-platform/0.1 (personal project)"}
+HEADERS = {"User-Agent": "careerops/0.1 (personal project)"}
 
 
 def _parse_dt(value: str | None) -> datetime | None:
