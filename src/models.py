@@ -25,5 +25,6 @@ class JobPosting:
 
     # Optional
     description: str | None = None
+    compensation_raw: str | None = None   # only some sources publish this
     job_family_id: str | None = None   # grouping hint, NOT identity
     raw: dict | None = None            # original payload, kept for debugging

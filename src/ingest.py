@@ -1,5 +1,6 @@
 from src.adapters.greenhouse import GreenhouseAdapter
 from src.adapters.lever import LeverAdapter
+from src.adapters.ashby import AshbyAdapter
 from src.db import upsert_postings, close_missing
 
 # Which companies live on which source. Board tokens do not transfer
@@ -7,6 +8,7 @@ from src.db import upsert_postings, close_missing
 BOARDS = [
     (GreenhouseAdapter(), "stripe"),
     (LeverAdapter(), "spotify"),
+    (AshbyAdapter(), "ramp"),
 ]
 
 

@@ -18,12 +18,12 @@ engine = create_engine(os.environ["DATABASE_URL"], future=True)
 UPSERT = text("""
 INSERT INTO jobs (
     canonical_id, source, board_token, source_job_id,
-    company_name, title, location_raw, apply_url, description,
+    company_name, title, location_raw, apply_url, description, compensation_raw,
     posted_at, updated_at, first_seen_at, last_seen_at,
     job_family_id, raw
 ) VALUES (
     :canonical_id, :source, :board_token, :source_job_id,
-    :company_name, :title, :location_raw, :apply_url, :description,
+    :company_name, :title, :location_raw, :apply_url, :description, :compensation_raw,
     :posted_at, :updated_at, :first_seen_at, :first_seen_at,
     :job_family_id, :raw
 )
@@ -32,6 +32,7 @@ ON CONFLICT (canonical_id) DO UPDATE SET
     location_raw  = EXCLUDED.location_raw,
     apply_url     = EXCLUDED.apply_url,
     description   = COALESCE(EXCLUDED.description, jobs.description),
+    compensation_raw = EXCLUDED.compensation_raw,
     updated_at    = EXCLUDED.updated_at,
     raw           = EXCLUDED.raw,
 
@@ -59,6 +60,7 @@ def upsert_postings(postings: list[JobPosting]) -> int:
             "location_raw": p.location_raw,
             "apply_url": p.apply_url,
             "description": p.description,
+            "compensation_raw": p.compensation_raw,
             "posted_at": p.posted_at,
             "updated_at": p.updated_at,
             "first_seen_at": p.first_seen_at,
