@@ -4,11 +4,12 @@ from pathlib import Path
 
 import requests
 import yaml
+from sqlalchemy import text
 
 from src.adapters.greenhouse import GreenhouseAdapter
 from src.adapters.lever import LeverAdapter
 from src.adapters.ashby import AshbyAdapter
-from src.db import upsert_postings, close_missing
+from src.db import upsert_postings, close_missing, engine
 
 ADAPTERS = {
     "greenhouse": GreenhouseAdapter(),
@@ -23,6 +24,7 @@ REQUEST_DELAY_SECONDS = 0.5
 
 
 def load_boards() -> list[tuple[str, str]]:
+    """Board list from config/companies.yml. Used to seed the DB."""
     data = yaml.safe_load(CONFIG.read_text())
     return [
         (source, token)
@@ -31,8 +33,35 @@ def load_boards() -> list[tuple[str, str]]:
     ]
 
 
+def active_boards() -> list[tuple[str, str]]:
+    """Boards to poll. The companies table is the source of truth; a board
+    marked inactive (moved ATS, dead token) is skipped without being deleted,
+    so the reason it was dropped stays recorded."""
+    with engine.begin() as conn:
+        rows = conn.execute(text("""
+            SELECT source, board_token FROM companies
+             WHERE is_active ORDER BY source, board_token
+        """)).fetchall()
+    return [(r.source, r.board_token) for r in rows]
+
+
+def record_result(source: str, board_token: str, status: str, count: int | None) -> None:
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE companies
+                   SET last_ingest_at = now(),
+                       last_ingest_status = :status,
+                       last_job_count = :count
+                 WHERE source = :source AND board_token = :board_token
+            """),
+            {"status": status, "count": count,
+             "source": source, "board_token": board_token},
+        )
+
+
 def run() -> int:
-    boards = load_boards()
+    boards = active_boards()
     print(f"Ingesting {len(boards)} boards\n")
 
     total_upserted = total_closed = failures = 0
@@ -65,6 +94,7 @@ def run() -> int:
         total_upserted += written
         total_closed += closed
 
+        record_result(source, board_token, "ok", written)
         print(f"  ok    {source}:{board_token:14} {written:5} upserted, {closed:4} closed")
         time.sleep(REQUEST_DELAY_SECONDS)
 
