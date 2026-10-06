@@ -3,7 +3,7 @@
 **Owner:** Mansi Gondil
 **Started:** September 2026
 **Type:** Portfolio project — multi-agent systems, MCP, MLOps
-**Status:** Planning
+**Status:** Phase 1 complete; Phase 2 next
 
 ---
 
@@ -55,6 +55,7 @@ Treating the fit model as a production ML asset with training, versioning, CI-ga
 - LinkedIn/Indeed scraping (ToS violation; ATS APIs are the legitimate route)
 - Multi-user / SaaS deployment
 - Paid contact-enrichment APIs (Phase 5 accepts a manual lookup step)
+- Automated employer screening against DOL filing data. Resolving ~27k government employer records against ATS board tokens costs roughly a day of entity-resolution work to save ~15 minutes a month at this application volume, and a boolean verdict discards the context that actually matters — "filed 40, none since 2024" and "filed 3, all PhD research roles" classify identically and mean very different things. Sponsorship is checked by hand once per company and cached in the `companies` table.
 
 ### Non-negotiable constraints
 | Constraint | Reason |
@@ -78,7 +79,7 @@ Metrics are defined tightly on purpose — loosely defined funnel numbers are th
 | Discovery latency | Median hours from `posted_at` to `first_seen_at` | < 12h |
 | Dedup precision | Distinct roles / total ingested rows | > 0.95 |
 | Coverage | Tracked companies with a working ATS feed | > 150 |
-| Employer screening coverage | Postings with a resolved sponsorship/standing verdict | > 90% |
+| Sponsorship check coverage | Companies with eligible roles that carry a recorded sponsorship note | 100% |
 | Pipeline uptime | Scheduled runs completing without manual intervention | > 95% |
 | Cost per posting processed | Total spend / postings scored | $0.00 |
 
@@ -163,12 +164,14 @@ Get real job data into a real database. Nothing intelligent yet.
 - Greenhouse public API ingestion for ~20 target companies, written behind a `SourceAdapter` interface from the first line — every provider yields an identical normalised record
 - Canonical job ID and dedup logic
 - Eligibility hard filters: location, seniority, apply-window open
-- **Employer screening** against public government data: sponsorship filing history, debarment list (barred employers never surface), employer standing. Cached per employer, not per posting.
+- **Company registry** (`companies` table) as the source of truth for active boards, carrying per-board ingest status and a manually recorded sponsorship note per employer, cached so the lookup is never repeated
 - Daily scheduled run
 
-**Exit criteria:** `SELECT count(*) FROM jobs` returns a few hundred deduplicated, screened, current postings, refreshed daily without intervention. Adding a second ATS provider requires no changes outside a new adapter class.
+**Exit criteria:** `SELECT count(*) FROM jobs` returns a few hundred deduplicated, filtered, current postings, refreshed daily without intervention. Adding a second ATS provider requires no changes outside a new adapter class.
 
-**Risk:** low. Public APIs, no auth. Main effort is entity resolution — matching an ATS company name to a government dataset employer record. Accept fuzzy matching with a confidence score and an "unresolved" state rather than forcing a verdict.
+**Status — met.** Three providers (Greenhouse, Lever, Ashby), 15 boards, 3,076 postings ingested, 209 eligible. Scheduled daily via Windows Task Scheduler and verified running unattended in ~49s.
+
+**Risk:** low. Public APIs, no auth. The main surprises were in filtering, not ingestion: substring matching silently dropped every "Account Executive" on `iv`, an include-only function filter let "AI Sales" through on the AI keyword, and Canadian province codes (`NS`, `ON`, `BC`) collide with US state codes. All three were invisible until the drop list was read by hand.
 
 **Note on the adapter interface:** this is the highest-leverage decision in the project and it must be made before the first ingestion script, not after. Retrofitting normalisation across three providers is far more work than designing for it once.
 
@@ -276,7 +279,7 @@ Only reachable once Phase 2 has been running long enough to accumulate outcomes.
 | Time pressure from coursework / co-op | High | Phases are independently shippable; stopping after Phase 4 still yields a coherent project |
 | Benchmarking against senior-candidate results | Medium — false sense of failure | Published funnel numbers from 20-year-experience candidates are not a new-grad baseline. Measure against your own trend, not someone else's post. |
 | Prior art becoming public | Medium — reduces novelty | Comparable systems exist and are being open-sourced. Differentiation is the outcome-trained model and CI gate, not the pipeline itself. Read their ingestion code rather than rediscovering it. |
-| Entity resolution errors in employer screening | Medium — wrongly excluded employers | Confidence-scored fuzzy matching with an explicit "unresolved" state; never hard-exclude on a low-confidence match |
+| Over-filtering hides good roles | High — silent, and the shortlist still looks plausible | Filter verdicts stored with reasons; drop list reviewed by hand after every rule change. Three real bugs were found this way. |
 
 ---
 
@@ -296,6 +299,6 @@ What those systems do **not** have, and where the differentiation actually lives
 3. An explicit treatment of selection bias in a self-reinforcing recommendation system
 4. A designed multi-agent system with an orchestrator, rather than a single agent pointed at a set of tools
 
-Worth borrowing from prior art rather than reinventing: the source-adapter pattern, employer screening against government data, honest-gap reporting, and email-mined tracking. Reference implementations save weeks.
+Worth borrowing from prior art rather than reinventing: the source-adapter pattern, honest-gap reporting, and email-mined tracking. Reference implementations save weeks.
 
 And the thing that makes any of it credible: **real numbers from real use, with honest denominators.**
