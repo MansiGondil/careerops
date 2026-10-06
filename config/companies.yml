@@ -1,0 +1,28 @@
+# Which companies live on which ATS. Board tokens do not transfer
+# between providers, so source is part of the identity.
+#
+# Finding a token: open the company's careers page and read the URL.
+#   boards.greenhouse.io/{token}      -> greenhouse
+#   jobs.lever.co/{token}             -> lever
+#   jobs.ashbyhq.com/{token}          -> ashby
+
+greenhouse:
+  - stripe
+  - databricks
+  - discord
+  - robinhood
+  - instacart
+  - gitlab
+  - reddit
+  - coinbase
+
+lever:
+  - spotify
+
+ashby:
+  - ramp
+  - linear
+  - vanta
+  - replit
+  - deel
+  - notion

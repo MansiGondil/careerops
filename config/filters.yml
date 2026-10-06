@@ -1,0 +1,154 @@
+# Eligibility rules. Location is exclusion-based: anywhere in the US
+# counts, so we drop clearly-foreign roles rather than whitelist cities.
+
+location:
+  # A posting is excluded when its location mentions one of these and
+  # contains no US signal. Kept deliberately short — false exclusions
+  # are worse than a few foreign roles slipping through.
+  exclude_countries:
+    - Dublin
+    - London
+    - Berlin
+    - Munich
+    - Paris
+    - Amsterdam
+    - Stockholm
+    - Singapore
+    - Tokyo
+    - Sydney
+    - Toronto
+    - Canada
+    - Vancouver
+    - Bengaluru
+    - Bangalore
+    - Hyderabad
+    - Gurugram
+    - Pune
+    - Tel Aviv
+    - São Paulo
+    - Mexico City
+    - Warsaw
+    - Barcelona
+    - Madrid
+    - Zurich
+    - Hong Kong
+    - Seoul
+    - Shanghai
+    - Beijing
+
+  # Any of these means US-eligible even if a foreign city also appears
+  # (multi-location roles are common).
+  us_signals:
+    - "United States"
+    - "USA"
+    - "U.S."
+    - "Remote - US"
+    - "Remote (US)"
+    - "Remote in the US"
+    - "Remote from the US"
+    - "AMER"
+    - ", NY"
+    - ", CA"
+    - ", MA"
+    - ", WA"
+    - ", TX"
+    - ", IL"
+    - ", CO"
+    - ", GA"
+    - ", FL"
+    - ", NC"
+    - ", PA"
+    - ", OR"
+    - ", AZ"
+    - ", VA"
+    - ", NJ"
+    - New York
+    - San Francisco
+    - Seattle
+    - Boston
+    - Austin
+    - Chicago
+    - Denver
+    - Atlanta
+    - Los Angeles
+
+seniority:
+  # Titles matching these are too senior; dropped.
+  exclude_patterns:
+    - staff
+    - principal
+    - senior staff
+    - distinguished
+    - fellow
+    - director
+    - "head of"
+    - vp
+    - "vice president"
+    - chief
+    - manager        # people-management, not IC
+    - lead
+    - architect
+    - "sr"
+    - senior
+    - iii
+    - iv
+
+  # Minimum-years phrases in the description that exclude a role.
+  # Applied later, once descriptions are fetched.
+  max_years_experience: 5
+
+function:
+  # Checked FIRST. An include keyword alone is not enough: "Account
+  # Executive, AI Sales" matched on "ai" until these were added.
+  exclude_patterns:
+    - account executive
+    - sales
+    - recruiter
+    - recruiting
+    - marketing
+    - counsel
+    - attorney
+    - legal
+    - accountant
+    - accounting
+    - designer
+    - "customer success"
+    - "business development"
+    - partnerships
+    - gtm
+    - "go to market"
+    - "people operations"
+    - investigator
+    - support specialist
+    - intern
+    - internship
+    - payroll
+    - "corporate finance"
+    - "risk management"
+    - tax
+    - audit
+
+  # Only roles plausibly in scope. Matched against title.
+  include_patterns:
+    - engineer
+    - developer
+    - data scientist
+    - "machine learning"
+    - "ml engineer"
+    - "ml platform"
+    - data analyst
+    - business analyst
+    - product analyst
+    - quantitative analyst
+    - analytics
+    - sre
+    - "site reliability"
+    - devops
+    - platform
+    - infrastructure
+    - "forward deployed"
+    - "solutions architect"
+    - "ai engineer"
+    - "ai solutions"
+    - "applied ai"
+    - mlops
