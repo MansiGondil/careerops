@@ -1,0 +1,73 @@
+# Candidate board tokens. Probe before adding to companies.yml.
+# python -m src.check_boards --file config/candidates.txt
+
+# AI / ML native
+anthropic
+openai
+scaleai
+huggingface
+weightsandbiases
+cohere
+runwayml
+perplexityai
+sierra
+harvey
+glean
+abridge
+cursor
+sourcegraph
+
+# Data / ML infrastructure
+snowflake
+confluent
+dbtlabs
+fivetran
+astronomer
+clickhouse
+starburst
+tecton
+arizeai
+weaviate
+pinecone
+temporaltechnologies
+
+# Dev tools / platform
+vercel
+netlify
+hashicorp
+grafanalabs
+datadog
+pagerduty
+render
+railway
+supabase
+planetscale
+
+# Fintech
+brex
+mercury
+modern-treasury
+chime
+affirm
+marqeta
+checkr
+alloy
+
+# Health / bio tech
+tempus
+benchling
+komodohealth
+devoted
+cedar
+
+# Other engineering-dense
+cloudflare
+asana
+airtable
+retool
+amplitude
+mixpanel
+segment
+twilio
+figma
+webflow

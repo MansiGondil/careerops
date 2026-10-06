@@ -16,9 +16,35 @@ greenhouse:
   - reddit
   - coinbase
 
+  - anthropic
+  - scaleai
+  - fivetran
+  - starburst
+  - arizeai
+  - vercel
+  - netlify
+  - grafanalabs
+  - datadog
+  - pagerduty
+  - planetscale
+  - brex
+  - mercury
+  - chime
+  - affirm
+  - checkr
+  - alloy
+  - komodohealth
+  - cloudflare
+  - asana
+  - airtable
+  - mixpanel
+  - twilio
+  - figma
+  - webflow
 lever:
   - spotify
 
+  - tecton
 ashby:
   - ramp
   - linear
@@ -26,3 +52,26 @@ ashby:
   - replit
   - deel
   - notion
+  - openai
+  - cohere
+  - sierra
+  - harvey
+  - abridge
+  - cursor
+  - snowflake
+  - confluent
+  - astronomer
+  - clickhouse
+  - weaviate
+  - pinecone
+  - render
+  - railway
+  - supabase
+  - benchling
+  - cedar
+  - amplitude
+  - perplexity
+  - temporal
+  - marqeta-inc
+  - runway
+  - moderntreasury
