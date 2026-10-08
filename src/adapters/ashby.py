@@ -1,3 +1,4 @@
+from src.text import strip_html
 from datetime import datetime, timezone
 import requests
 
@@ -76,6 +77,8 @@ class AshbyAdapter(SourceAdapter):
                     company_name=job.get("companyName") or board_token,
                     title=job["title"],
                     location_raw=_flatten_location(job),
+                    description=job.get("descriptionPlain")
+                    or strip_html(job.get("descriptionHtml")),
                     apply_url=job.get("jobUrl") or job.get("applyUrl", ""),
                     posted_at=_parse_dt(job.get("publishedAt")),
                     updated_at=None,  # Ashby's public feed has no update field

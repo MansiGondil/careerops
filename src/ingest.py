@@ -87,7 +87,7 @@ def run() -> int:
             failures += 1
             continue
 
-        written = upsert_postings(postings)
+        written, unchanged = upsert_postings(postings)
         closed = close_missing(
             source, board_token, [p.canonical_id for p in postings]
         )
@@ -95,7 +95,7 @@ def run() -> int:
         total_closed += closed
 
         record_result(source, board_token, "ok", written)
-        print(f"  ok    {source}:{board_token:14} {written:5} upserted, {closed:4} closed")
+        print(f"  ok    {source}:{board_token:14} {written:5} written, {unchanged:5} same, {closed:4} closed")
         time.sleep(REQUEST_DELAY_SECONDS)
 
     print(f"\n{total_upserted} upserted, {total_closed} closed, {failures} failed")

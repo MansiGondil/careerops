@@ -1,3 +1,4 @@
+from src.text import join_sections, strip_html
 from datetime import datetime, timezone
 import requests
 
@@ -55,6 +56,10 @@ class LeverAdapter(SourceAdapter):
                     company_name=board_token,
                     title=post["text"],
                     location_raw=_flatten_location(post),
+                    description=join_sections(
+                        post.get("descriptionPlain"),
+                        *[strip_html(sec.get("content")) for sec in (post.get("lists") or [])],
+                    ),
                     apply_url=post.get("hostedUrl") or post.get("applyUrl", ""),
                     posted_at=_parse_epoch_ms(post.get("createdAt")),
                     updated_at=None,  # Lever's public feed has no update field

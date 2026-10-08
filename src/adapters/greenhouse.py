@@ -1,3 +1,4 @@
+from src.text import strip_html
 from datetime import datetime, timezone
 import requests
 
@@ -23,7 +24,7 @@ class GreenhouseAdapter(SourceAdapter):
 
     def fetch(self, board_token: str) -> list[JobPosting]:
         url = f"{BASE}/{board_token}/jobs"
-        response = requests.get(url, headers=HEADERS, timeout=30)
+        response = requests.get(url, params={"content": "true"}, headers=HEADERS, timeout=60)
         response.raise_for_status()
 
         seen_at = datetime.now(timezone.utc)
@@ -40,6 +41,7 @@ class GreenhouseAdapter(SourceAdapter):
                     company_name=job.get("company_name") or board_token,
                     title=job["title"],
                     location_raw=(job.get("location") or {}).get("name", ""),
+                    description=strip_html(job.get("content")),
                     apply_url=job["absolute_url"],
                     posted_at=_parse_dt(job.get("first_published")),
                     updated_at=_parse_dt(job.get("updated_at")),
