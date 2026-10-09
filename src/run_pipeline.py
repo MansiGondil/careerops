@@ -20,6 +20,10 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout),
     ],
 )
+# Third-party libraries log their HTTP traffic at INFO, which buries the
+# pipeline's own output and bloats the log file on every scheduled run.
+for noisy in ("httpx", "huggingface_hub", "sentence_transformers", "urllib3"):
+    logging.getLogger(noisy).setLevel(logging.WARNING)
 log = logging.getLogger("pipeline")
 
 
@@ -30,9 +34,13 @@ def main() -> int:
     try:
         from src.ingest import run as ingest
         from src.apply_filters import run as apply_filters
+        from src.embed_jobs import run as embed_jobs
+        from src.score import run as score
 
         ingest_status = ingest()
         apply_filters()
+        embed_jobs()
+        score()
 
     except Exception:
         # Full traceback to the log file; a scheduler only sees the exit code.
