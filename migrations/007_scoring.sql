@@ -1,0 +1,8 @@
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS fit_score REAL;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS fit_breakdown JSONB;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS scored_at TIMESTAMPTZ;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS scoring_model TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_jobs_fit
+    ON jobs (fit_score DESC NULLS LAST)
+    WHERE closed_at IS NULL AND is_eligible;
