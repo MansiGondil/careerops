@@ -47,7 +47,7 @@ def location_verdict(location_raw: str) -> tuple[bool, str]:
 
     # Strong US signals: an explicit country or city reference.
     # Checked separately from state suffixes because Canadian province
-    # codes collide with US state codes — "(ON, AB, BC, or NS Only)"
+    # codes collide with US state codes ï¿½ "(ON, AB, BC, or NS Only)"
     # matched ", NS" and bypassed the Canada exclusion.
     strong_us = any(
         signal in text for signal in US_SIGNALS if not signal.startswith(", ")
@@ -70,7 +70,7 @@ def location_verdict(location_raw: str) -> tuple[bool, str]:
 
 
 # Seniority tokens must match whole words. Plain substring matching
-# drops "Account Executive" on "iv" and "Archive" on "iv" — the kind of
+# drops "Account Executive" on "iv" and "Archive" on "iv" ï¿½ the kind of
 # silent over-filtering that is invisible until you read the drop list.
 SENIORITY_RE = [
     (p, re.compile(rf"\b{re.escape(p)}\b", re.IGNORECASE))
@@ -105,8 +105,8 @@ def function_verdict(title: str) -> tuple[bool, str]:
     return False, "no matching function"
 
 
-def evaluate(title: str, location_raw: str) -> tuple[bool, list[str]]:
-    """Returns (eligible, reasons). Reasons explain both keeps and drops."""
+def evaluate(title: str, location_raw: str,
+             description: str | None = None) -> tuple[bool, list[str]]:
     reasons = []
     eligible = True
 
@@ -114,9 +114,31 @@ def evaluate(title: str, location_raw: str) -> tuple[bool, list[str]]:
         location_verdict(location_raw),
         seniority_verdict(title),
         function_verdict(title),
+        description_verdict(description),
     ):
         reasons.append(reason)
         if not ok:
             eligible = False
 
     return eligible, reasons
+
+EXCLUDE_DESCRIPTION = _lower(RULES["description"]["exclude_patterns"])
+
+
+def description_verdict(description: str | None) -> tuple[bool, str]:
+    """
+    Hard blockers in the description body.
+
+    Citizenship, clearance and no-sponsorship statements rarely appear in
+    a title or location, so they survive every title-based rule. They are
+    absolute: no score makes such a role applyable.
+    """
+    text = (description or "").lower()
+    if not text:
+        return True, "no description â€” kept for review"
+
+    for pattern in EXCLUDE_DESCRIPTION:
+        if pattern in text:
+            return False, f"blocker: '{pattern}'"
+
+    return True, "no blockers"

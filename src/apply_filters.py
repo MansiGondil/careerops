@@ -13,7 +13,7 @@ from src.filters import evaluate
 def run() -> None:
     with engine.begin() as conn:
         rows = conn.execute(text("""
-            SELECT canonical_id, title, location_raw
+            SELECT canonical_id, title, location_raw, description
               FROM jobs WHERE closed_at IS NULL
         """)).fetchall()
 
@@ -24,7 +24,7 @@ def run() -> None:
                 "filter_reasons": "; ".join(reasons),
             }
             for r in rows
-            for eligible, reasons in [evaluate(r.title, r.location_raw)]
+            for eligible, reasons in [evaluate(r.title, r.location_raw, r.description)]
         ]
 
         conn.execute(
