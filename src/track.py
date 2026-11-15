@@ -2,16 +2,20 @@
 Application tracker.
 
     python -m src.track apply <canonical_id> [--explore] [--note "..."]
-    python -m src.track status <canonical_id> <new_status> [--note "..."]
+    python -m src.track external "<Company>" "<Title>" [--note "..."]
+    python -m src.track status <id> <new_status> [--note "..."]
     python -m src.track list [status]
     python -m src.track funnel
     python -m src.track ghost [days]
 
-Outcome data is the fuel for Phase 6 and accumulates only in wall-clock
-time, so logging has to be cheap enough to actually do. Everything here is
-one short command.
+Applications made outside the pipeline are logged too. Excluding them
+would make every funnel number wrong — a response rate computed over a
+subset of applications is not a response rate. They carry no fit score,
+so they inform reporting but not model training.
 """
 
+import re
+import secrets
 import sys
 from datetime import datetime, timezone
 
@@ -19,19 +23,18 @@ from sqlalchemy import text
 
 from src.db import engine
 
-# Ordered progression. rejected and ghosted are terminal from anywhere.
 PIPELINE = ["applied", "screen", "interview", "offer"]
 TERMINAL = ["rejected", "ghosted", "withdrawn"]
 VALID = PIPELINE + TERMINAL
 
-# A role with no response after this long is treated as ghosted. Silence is
-# the most common outcome and it has to become a recorded label, not an
-# application that sits in "applied" forever.
 GHOST_AFTER_DAYS = 30
 
 
-def _record(conn, canonical_id: str, from_status: str | None,
-            to_status: str, source: str, note: str | None) -> None:
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+def _record(conn, canonical_id, from_status, to_status, source, note):
     conn.execute(
         text("""
             INSERT INTO outcomes (canonical_id, from_status, to_status, source, note)
@@ -46,7 +49,7 @@ def apply_to(canonical_id: str, explore: bool = False, note: str | None = None) 
     with engine.begin() as conn:
         job = conn.execute(
             text("""
-                SELECT title, company_name, fit_score, scoring_model
+                SELECT title, company_name, fit_score, scoring_model, apply_url
                   FROM jobs WHERE canonical_id = :cid
             """),
             {"cid": canonical_id},
@@ -54,35 +57,74 @@ def apply_to(canonical_id: str, explore: bool = False, note: str | None = None) 
 
         if job is None:
             print(f"no such job: {canonical_id}")
+            print("for a role found outside the pipeline, use: track external")
             return
 
-        existing = conn.execute(
-            text("SELECT status FROM applications WHERE canonical_id = :cid"),
+        if conn.execute(
+            text("SELECT 1 FROM applications WHERE canonical_id = :cid"),
             {"cid": canonical_id},
-        ).fetchone()
-
-        if existing:
-            print(f"already logged — status '{existing.status}'")
+        ).fetchone():
+            print("already logged")
             return
 
-        # fit_score is copied, not joined. Re-scoring or a profile edit
-        # changes the job's current score, but the score that predicted
-        # this outcome is the one at the moment of applying.
         conn.execute(
             text("""
                 INSERT INTO applications (
-                    canonical_id, fit_score_at_apply, scoring_model,
-                    is_exploration, notes
-                ) VALUES (:cid, :score, :model, :explore, :note)
+                    canonical_id, company_name, title, apply_url,
+                    fit_score_at_apply, scoring_model, is_exploration,
+                    origin, notes
+                ) VALUES (
+                    :cid, :company, :title, :url,
+                    :score, :model, :explore, 'careerops', :note
+                )
             """),
-            {"cid": canonical_id, "score": job.fit_score,
+            {"cid": canonical_id, "company": job.company_name, "title": job.title,
+             "url": job.apply_url, "score": job.fit_score,
              "model": job.scoring_model, "explore": explore, "note": note},
         )
         _record(conn, canonical_id, None, "applied", "manual", note)
 
-    tag = "  [exploration]" if explore else ""
     score = f"{job.fit_score:.2f}" if job.fit_score is not None else "n/a"
+    tag = "  [exploration]" if explore else ""
     print(f"logged  {job.company_name} — {job.title}  (fit {score}){tag}")
+
+
+def external(company: str, title: str, note: str | None = None,
+             url: str | None = None, when: str | None = None) -> str:
+    """
+    Log an application to a role the pipeline never saw.
+
+    No fit score: the role was never ingested or embedded. These rows count
+    toward the funnel and are excluded from training, where a missing
+    feature would be worse than a missing row.
+
+    The id carries a random suffix because multiple roles at one company on
+    one day are normal, and a company+date key collides.
+    """
+    import secrets
+
+    day = when or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    canonical_id = f"external:{_slug(company)}:{day}:{secrets.token_hex(3)}"
+
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO applications (
+                    canonical_id, company_name, title, apply_url,
+                    origin, notes, applied_at
+                ) VALUES (
+                    :cid, :company, :title, :url, 'external', :note,
+                    COALESCE(CAST(:day AS timestamptz), now())
+                )
+                ON CONFLICT (canonical_id) DO NOTHING
+            """),
+            {"cid": canonical_id, "company": company, "title": title,
+             "url": url, "note": note, "day": day},
+        )
+        _record(conn, canonical_id, None, "applied", "manual", note)
+
+    print(f"logged  {company} — {title}  [external]")
+    return canonical_id
 
 
 def set_status(canonical_id: str, new_status: str,
@@ -100,9 +142,7 @@ def set_status(canonical_id: str, new_status: str,
         if row is None:
             print(f"not tracked: {canonical_id}")
             return
-
         if row.status == new_status:
-            print(f"already '{new_status}'")
             return
 
         conn.execute(
@@ -115,11 +155,11 @@ def set_status(canonical_id: str, new_status: str,
         )
         _record(conn, canonical_id, row.status, new_status, source, note)
 
-    print(f"{row.status} -> {new_status}")
+    print(f"  {row.status} -> {new_status}")
 
 
 def ghost(days: int = GHOST_AFTER_DAYS) -> None:
-    """Silence is an outcome. Make it an explicit label rather than a gap."""
+    """Silence is an outcome. Make it a label rather than a gap."""
     with engine.begin() as conn:
         stale = conn.execute(
             text("""
@@ -133,8 +173,7 @@ def ghost(days: int = GHOST_AFTER_DAYS) -> None:
         for row in stale:
             conn.execute(
                 text("""
-                    UPDATE applications
-                       SET status = 'ghosted', last_change_at = now()
+                    UPDATE applications SET status = 'ghosted', last_change_at = now()
                      WHERE canonical_id = :cid
                 """),
                 {"cid": row.canonical_id},
@@ -147,16 +186,15 @@ def ghost(days: int = GHOST_AFTER_DAYS) -> None:
 
 def list_applications(status: str | None = None) -> None:
     query = """
-        SELECT a.status, a.applied_at::date AS applied,
-               a.fit_score_at_apply AS fit, a.is_exploration,
-               j.company_name, j.title
-          FROM applications a JOIN jobs j USING (canonical_id)
+        SELECT status, applied_at::date AS applied, fit_score_at_apply AS fit,
+               is_exploration, origin, company_name, title
+          FROM applications
     """
     params = {}
     if status:
-        query += " WHERE a.status = :status"
+        query += " WHERE status = :status"
         params["status"] = status
-    query += " ORDER BY a.applied_at DESC"
+    query += " ORDER BY applied_at DESC"
 
     with engine.begin() as conn:
         rows = conn.execute(text(query), params).fetchall()
@@ -166,27 +204,30 @@ def list_applications(status: str | None = None) -> None:
         return
 
     for r in rows:
-        fit = f"{r.fit:.2f}" if r.fit is not None else " n/a"
-        flag = " *" if r.is_exploration else "  "
-        print(f"{r.applied}  {r.status:10} {fit}{flag} {r.company_name[:16]:18} {r.title[:48]}")
+        fit = f"{r.fit:.2f}" if r.fit is not None else "  - "
+        flag = "*" if r.is_exploration else " "
+        mark = "+" if r.origin == "external" else " "
+        company = (r.company_name or "?")[:16]
+        title = (r.title or "")[:44]
+        print(f"{r.applied}  {r.status:10} {fit}{flag}{mark} {company:18} {title}")
 
-    print(f"\n{len(rows)} applications  (* = exploration)")
+    print(f"\n{len(rows)} applications  (* exploration, + external)")
 
 
 def funnel() -> None:
     """
-    Denominators stated explicitly. Rates are over applications submitted,
-    never over pipeline size — that is the most common way these numbers
-    get inflated.
+    Denominators stated explicitly: rates are over applications submitted,
+    never over pipeline size.
     """
     with engine.begin() as conn:
-        total = conn.execute(
-            text("SELECT count(*) FROM applications")
-        ).scalar()
-
+        total = conn.execute(text("SELECT count(*) FROM applications")).scalar()
         if not total:
             print("no applications logged yet")
             return
+
+        by_origin = conn.execute(
+            text("SELECT origin, count(*) AS n FROM applications GROUP BY 1")
+        ).fetchall()
 
         reached = conn.execute(
             text("""
@@ -204,13 +245,15 @@ def funnel() -> None:
     counts = {r.to_status: r.n for r in reached}
 
     print(f"\napplications submitted   {total}")
-    print("-" * 42)
+    for r in by_origin:
+        print(f"   {r.origin:12} {r.n}")
+    print("-" * 44)
     for stage in ("screen", "interview", "offer"):
         n = counts.get(stage, 0)
         print(f"reached {stage:12} {n:5}   {n/total:6.1%} of submitted")
 
     print("\ncurrent status")
-    print("-" * 42)
+    print("-" * 44)
     for r in sorted(current, key=lambda r: r.n, reverse=True):
         print(f"  {r.status:12} {r.n:5}")
     print()
@@ -235,6 +278,8 @@ def main() -> int:
 
     if cmd == "apply" and rest:
         apply_to(rest[0], explore=explore, note=note)
+    elif cmd == "external" and len(rest) >= 2:
+        external(rest[0], rest[1], note=note)
     elif cmd == "status" and len(rest) >= 2:
         set_status(rest[0], rest[1], note=note)
     elif cmd == "list":

@@ -36,11 +36,13 @@ def main() -> int:
         from src.apply_filters import run as apply_filters
         from src.embed_jobs import run as embed_jobs
         from src.score import run as score
+        from src.email_ingest import run as email_ingest
 
         ingest_status = ingest()
         apply_filters()
         embed_jobs()
         score()
+        email_ingest()
 
     except Exception:
         # Full traceback to the log file; a scheduler only sees the exit code.
