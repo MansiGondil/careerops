@@ -14,3 +14,7 @@ __pycache__/
 # Local infra
 *.db
 *.sqlite3
+
+# Google OAuth — never commit
+credentials.json
+token.json
